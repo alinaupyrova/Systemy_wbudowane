@@ -1,0 +1,96 @@
+/*
+ * File:   lab1.c
+ * Author: local
+ *
+ * Created on 10 kwietnia 2025, 14:43
+ */
+
+
+#include <xc.h>
+#include "libpic30.h"
+
+
+int zad1(void) {
+    
+    unsigned char portValue = 0x55; //swieci do druga dioda
+    
+    AD1PCFG = 0xFFFF; // ustawiamy tryb cyfrowy
+    TRISA = 0X0000; // port a jako wyjscie
+    
+    LATA = portValue;
+    
+    return 0;
+}
+
+int zad2(void) {
+    
+    unsigned char portValue; //swieci do druga dioda
+    
+    AD1PCFG = 0xFFFF; // ustawiamy tryb cyfrowy
+    TRISA = 0X0000; // port a jako wyjscie
+    
+    while(1){
+        
+        portValue = 0x0F;
+        LATA = portValue;
+        
+        __delay32(1000000);
+        
+        portValue = 0xF0;
+        LATA = portValue;
+        
+        __delay32(1000000);
+    }
+    
+    return -1;
+}
+
+int zad3(void) {
+    
+    unsigned portValue = 0x0001; // startowo 1 dioda
+    
+    char aktualny = 0;
+    char poprzedni = 0;
+    
+    TRISA = 0x0000;
+    TRISD = 0xFFFF;
+    
+    int value = 1; //tryb dzialania programu
+    
+    while(1){
+        
+        switch(value){
+            case 1:
+                LATA = portValue;
+                portValue ++;
+                if(portValue == 0xFF){
+                    portValue = 0;
+                }
+                break;
+                
+            case 2:
+                LATA = portValue;
+                portValue --;
+                if(portValue == 0xFF){
+                    portValue = 0;
+                }
+                break;
+        }
+        
+         poprzedni = PORTDbits.RD6;
+         __delay32(3000000);
+         aktualny = PORTDbits.RD6;
+         
+         if(poprzedni == 1 && aktualny == 0){
+             value++;
+             if(value > 2){
+                 value = 1;
+             }
+             portValue = 1;
+         }
+    }
+    
+    
+    
+    return 0;
+}
