@@ -47,7 +47,7 @@ int zad2(void) {
 
 int zad3(void) {
     
-    unsigned portValue = 0x0001; // startowo 1 dioda
+    unsigned portValue = 0x0001; // start  owo 1 dioda
     
     char aktualny = 0;
     char poprzedni = 0;
