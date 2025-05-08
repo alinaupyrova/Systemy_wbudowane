@@ -1,6 +1,9 @@
 #include <xc.h>
 #include "libpic30.h"
 
+// Конфигурация (добавь по нужде)
+// _CONFIG(...)
+
 void zad1(void);
 void zad2(void);
 void zad3(void);
@@ -15,28 +18,30 @@ int main(void) {
     int currentProgram = 1;
     int prevRD6 = 1, prevRD13 = 1;
 
-    AD1PCFG = 0xFFFF;
-    TRISD = 0xFFFF;
-    TRISA = 0x0000;
+    AD1PCFG = 0xFFFF;  // все пины как цифровые
+    TRISD = 0xFFFF;    // PORTD как вход (для кнопок)
+    TRISA = 0x0000;    // PORTA как выход
 
-    while(1) {
+    while (1) {
         int rd6 = PORTDbits.RD6;
         int rd13 = PORTDbits.RD13;
 
         if (prevRD6 == 1 && rd6 == 0) {
             currentProgram++;
             if (currentProgram > 9) currentProgram = 1;
+            __delay32(1000000); // задержка антидребезга
         }
 
         if (prevRD13 == 1 && rd13 == 0) {
             currentProgram--;
             if (currentProgram < 1) currentProgram = 9;
+            __delay32(1000000); // задержка антидребезга
         }
 
         prevRD6 = rd6;
         prevRD13 = rd13;
 
-        switch(currentProgram) {
+        switch (currentProgram) {
             case 1: zad1(); break;
             case 2: zad2(); break;
             case 3: zad3(); break;
@@ -67,29 +72,24 @@ void zad2(void) {
 }
 
 void zad3(void) {
-    static unsigned portValue = 0x01;
-    static char value = 1;
-    static char prevRD6 = 1;
+    static unsigned char portValue = 0x01;
+    static char direction = 1;
 
     LATA = portValue;
 
-    if (value == 1) {
+    if (direction) {
         portValue <<= 1;
-        if (portValue == 0) portValue = 0x01;
+        if (portValue == 0) {
+            portValue = 0x40;
+            direction = 0;
+        }
     } else {
         portValue >>= 1;
-        if (portValue == 0) portValue = 0x80;
+        if (portValue == 0) {
+            portValue = 0x02;
+            direction = 1;
+        }
     }
-
-    char currRD6 = PORTDbits.RD6;
-
-    if (prevRD6 == 1 && currRD6 == 0) {
-        value++;
-        if (value > 2) value = 1;
-        portValue = 0x01;
-    }
-
-    prevRD6 = currRD6;
 
     __delay32(3000000);
 }
