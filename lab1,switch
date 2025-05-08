@@ -1,8 +1,9 @@
 #include <xc.h>
 #include "libpic30.h"
 
-// Конфигурация (добавь по нужде)
-// _CONFIG(...)
+// Предположим, что используешь dsPIC33/30. Настройка зависит от модели.
+_FOSC(CSW_FSCM_OFF & XT); 
+_FWDT(WDT_OFF); 
 
 void zad1(void);
 void zad2(void);
@@ -18,9 +19,10 @@ int main(void) {
     int currentProgram = 1;
     int prevRD6 = 1, prevRD13 = 1;
 
-    AD1PCFG = 0xFFFF;  // все пины как цифровые
-    TRISD = 0xFFFF;    // PORTD как вход (для кнопок)
-    TRISA = 0x0000;    // PORTA как выход
+    AD1PCFG = 0xFFFF;   // Все пины цифровые
+    TRISA = 0x0000;     // PORTA как выход
+    LATA = 0x00;        // Гасим всё на старте
+    TRISD = 0xFFFF;     // PORTD как вход (RD6, RD13)
 
     while (1) {
         int rd6 = PORTDbits.RD6;
@@ -29,13 +31,13 @@ int main(void) {
         if (prevRD6 == 1 && rd6 == 0) {
             currentProgram++;
             if (currentProgram > 9) currentProgram = 1;
-            __delay32(1000000); // задержка антидребезга
+            __delay32(1000000); // антидребезг
         }
 
         if (prevRD13 == 1 && rd13 == 0) {
             currentProgram--;
             if (currentProgram < 1) currentProgram = 9;
-            __delay32(1000000); // задержка антидребезга
+            __delay32(1000000); // антидребезг
         }
 
         prevRD6 = rd6;
@@ -57,6 +59,7 @@ int main(void) {
     return 0;
 }
 
+// Счётчик вверх
 void zad1(void) {
     for (int i = 0; i < 256; i++) {
         LATA = i;
@@ -64,6 +67,7 @@ void zad1(void) {
     }
 }
 
+// Счётчик вниз
 void zad2(void) {
     for (int i = 255; i >= 0; i--) {
         LATA = i;
@@ -71,82 +75,78 @@ void zad2(void) {
     }
 }
 
+// Вэнжик 3-битный (бегает влево-вправо)
 void zad3(void) {
-    static unsigned char portValue = 0x01;
+    static unsigned char pattern = 0x01;
     static char direction = 1;
 
-    LATA = portValue;
+    LATA = pattern;
 
     if (direction) {
-        portValue <<= 1;
-        if (portValue == 0) {
-            portValue = 0x40;
-            direction = 0;
-        }
+        pattern <<= 1;
+        if (pattern == 0x80) direction = 0;
     } else {
-        portValue >>= 1;
-        if (portValue == 0) {
-            portValue = 0x02;
-            direction = 1;
-        }
+        pattern >>= 1;
+        if (pattern == 0x01) direction = 1;
     }
 
-    __delay32(3000000);
+    __delay32(1000000);
 }
 
+// Код Грея вверх
 void zad4(void) {
     for (int i = 0; i < 256; i++) {
-        unsigned char gray = i ^ (i >> 1);
-        LATA = gray;
+        LATA = i ^ (i >> 1);
         __delay32(1000000);
     }
 }
 
+// Код Грея вниз
 void zad5(void) {
     for (int i = 255; i >= 0; i--) {
-        unsigned char gray = i ^ (i >> 1);
-        LATA = gray;
+        LATA = i ^ (i >> 1);
         __delay32(1000000);
     }
 }
 
+// BCD счётчик вверх 0…99
 void zad6(void) {
     for (int i = 0; i <= 99; i++) {
-        unsigned char bcd = ((i / 10) << 4) | (i % 10);
-        LATA = bcd;
+        LATA = ((i / 10) << 4) | (i % 10);
         __delay32(1000000);
     }
 }
 
+// BCD счётчик вниз 99…0
 void zad7(void) {
     for (int i = 99; i >= 0; i--) {
-        unsigned char bcd = ((i / 10) << 4) | (i % 10);
-        LATA = bcd;
+        LATA = ((i / 10) << 4) | (i % 10);
         __delay32(1000000);
     }
 }
 
+// Очередь (паттерны в массиве)
 void zad8(void) {
-    unsigned char kolejkaStany[] = {
+    unsigned char sequence[] = {
         0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01,
         0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF,
         0xFE, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0, 0x80, 0x00
     };
-    int liczbaStanow = sizeof(kolejkaStany) / sizeof(kolejkaStany[0]);
+    int len = sizeof(sequence) / sizeof(sequence[0]);
 
-    for (int i = 0; i < liczbaStanow; i++) {
-        LATA = kolejkaStany[i];
-        __delay32(500000);
+    for (int i = 0; i < len; i++) {
+        LATA = sequence[i];
+        __delay32(700000);
     }
 }
 
+// LFSR 6-бит (псевдослучайный)
 void zad9(void) {
     static unsigned char lfsr = 0x3F;
-
     LATA = lfsr;
-    unsigned char bit = ((lfsr >> 5) ^ (lfsr >> 1)) & 1;
-    lfsr = (lfsr << 1) | bit;
-    lfsr &= 0x3F;
+
+    unsigned char bit = ((lfsr >> 5) ^ (lfsr >> 1)) & 0x01;
+    lfsr = ((lfsr << 1) | bit) & 0x3F;
 
     __delay32(1000000);
 }
