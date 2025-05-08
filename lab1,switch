@@ -17,6 +17,7 @@ int main(void) {
 
     AD1PCFG = 0xFFFF;
     TRISD = 0xFFFF;
+    TRISA = 0x0000;
 
     while(1) {
         int rd6 = PORTDbits.RD6;
@@ -52,8 +53,6 @@ int main(void) {
 }
 
 void zad1(void) {
-    TRISA = 0x0000;
-    AD1PCFG = 0xFFFF;
     for (int i = 0; i < 256; i++) {
         LATA = i;
         __delay32(1000000);
@@ -61,8 +60,6 @@ void zad1(void) {
 }
 
 void zad2(void) {
-    TRISA = 0x0000;
-    AD1PCFG = 0xFFFF;
     for (int i = 255; i >= 0; i--) {
         LATA = i;
         __delay32(1000000);
@@ -70,38 +67,34 @@ void zad2(void) {
 }
 
 void zad3(void) {
-    unsigned portValue = 0x01;
-    char aktualny = 0, poprzedni = 0;
-    TRISA = 0x0000;
-    TRISD = 0xFFFF;
-    int value = 1;
+    static unsigned portValue = 0x01;
+    static char value = 1;
+    static char prevRD6 = 1;
 
-    while(1){
-        switch(value){
-            case 1:
-                LATA = portValue++;
-                if (portValue == 0xFF) portValue = 0;
-                break;
-            case 2:
-                LATA = portValue--;
-                if (portValue == 0xFF) portValue = 0;
-                break;
-        }
+    LATA = portValue;
 
-        poprzedni = PORTDbits.RD6;
-        __delay32(3000000);
-        aktualny = PORTDbits.RD6;
-
-        if (poprzedni == 1 && aktualny == 0){
-            value++;
-            if (value > 2) value = 1;
-            portValue = 1;
-        }
+    if (value == 1) {
+        portValue <<= 1;
+        if (portValue == 0) portValue = 0x01;
+    } else {
+        portValue >>= 1;
+        if (portValue == 0) portValue = 0x80;
     }
+
+    char currRD6 = PORTDbits.RD6;
+
+    if (prevRD6 == 1 && currRD6 == 0) {
+        value++;
+        if (value > 2) value = 1;
+        portValue = 0x01;
+    }
+
+    prevRD6 = currRD6;
+
+    __delay32(3000000);
 }
 
 void zad4(void) {
-    TRISA = 0x0000;
     for (int i = 0; i < 256; i++) {
         unsigned char gray = i ^ (i >> 1);
         LATA = gray;
@@ -110,7 +103,6 @@ void zad4(void) {
 }
 
 void zad5(void) {
-    TRISA = 0x0000;
     for (int i = 255; i >= 0; i--) {
         unsigned char gray = i ^ (i >> 1);
         LATA = gray;
@@ -119,7 +111,6 @@ void zad5(void) {
 }
 
 void zad6(void) {
-    TRISA = 0x0000;
     for (int i = 0; i <= 99; i++) {
         unsigned char bcd = ((i / 10) << 4) | (i % 10);
         LATA = bcd;
@@ -128,7 +119,6 @@ void zad6(void) {
 }
 
 void zad7(void) {
-    TRISA = 0x0000;
     for (int i = 99; i >= 0; i--) {
         unsigned char bcd = ((i / 10) << 4) | (i % 10);
         LATA = bcd;
@@ -137,8 +127,6 @@ void zad7(void) {
 }
 
 void zad8(void) {
-    TRISA = 0x0000;
-    AD1PCFG = 0xFFFF;
     unsigned char kolejkaStany[] = {
         0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01,
         0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF,
@@ -153,13 +141,12 @@ void zad8(void) {
 }
 
 void zad9(void) {
-    TRISA = 0x0000;
-    unsigned char lfsr = 0x3F;
-    while(1){
-        LATA = lfsr;
-        unsigned char bit = ((lfsr >> 5) ^ (lfsr >> 1)) & 1;
-        lfsr = (lfsr << 1) | bit;
-        lfsr &= 0x3F;
-        __delay32(1000000);
-    }
+    static unsigned char lfsr = 0x3F;
+
+    LATA = lfsr;
+    unsigned char bit = ((lfsr >> 5) ^ (lfsr >> 1)) & 1;
+    lfsr = (lfsr << 1) | bit;
+    lfsr &= 0x3F;
+
+    __delay32(1000000);
 }
