@@ -108,3 +108,20 @@ int main(void) {
 
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+make[2]: *** [nbproject/Makefile-default.mk:148: dist/default/debug/mplab2.X.debug.elf] Error 255
+make[1]: *** [nbproject/Makefile-default.mk:85: .build-conf] Error 2
+make: *** [nbproject/Makefile-impl.mk:39: .build-impl] Error 2
+
+BUILD FAILED (exit value 2, total time: 565ms)
