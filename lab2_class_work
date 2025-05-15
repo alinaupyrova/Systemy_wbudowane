@@ -74,6 +74,156 @@ int main(void) {
             __delay32(opoznienie);
         }
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+ * File:   newmainXC16.c
+ * Author: local
+ *
+ * Created on April 17, 2025, 2:12 PM
+ */
+// PIC24FJ128GA010 Configuration Bit Settings
+
+// 'C' source line config statements
+
+// CONFIG2
+#pragma config POSCMOD = XT             // Primary Oscillator Select (XT Oscillator mode selected)
+#pragma config OSCIOFNC = ON            // Primary Oscillator Output Function (OSC2/CLKO/RC15 functions as port I/O (RC15))
+#pragma config FCKSM = CSDCMD           // Clock Switching and Monitor (Clock switching and Fail-Safe Clock Monitor are disabled)
+#pragma config FNOSC = PRI              // Oscillator Select (Primary Oscillator (XT, HS, EC))
+#pragma config IESO = ON                // Internal External Switch Over Mode (IESO mode (Two-Speed Start-up) enabled)
+
+// CONFIG1
+#pragma config WDTPS = PS32768          // Watchdog Timer Postscaler (1:32,768)
+#pragma config FWPSA = PR128            // WDT Prescaler (Prescaler ratio of 1:128)
+#pragma config WINDIS = ON              // Watchdog Timer Window (Standard Watchdog Timer enabled,(Windowed-mode is disabled))
+#pragma config FWDTEN = ON              // Watchdog Timer Enable (Watchdog Timer is enabled)
+#pragma config ICS = PGx2               // Comm Channel Select (Emulator/debugger uses EMUC2/EMUD2)
+#pragma config GWRP = OFF               // General Code Segment Write Protect (Writes to program memory are allowed)
+#pragma config GCP = OFF                // General Code Segment Code Protect (Code protection is disabled)
+#pragma config JTAGEN = OFF             // JTAG Port Enable (JTAG port is disabled)
+
+// #pragma config statements should precede project file includes.
+// Use project enums instead of #define for ON and OFF.
+#include "xc.h"
+#include "libpic30.h"
+#include "adc.h"
+#include "buttons.h"
+
+void init(void){
+    ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
+    ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
+    TRISA = 0x0000; //port a wyjscie
+    TRISD |= (1<<6); //rd6 na wejsciu
+}
+
+uint8_t binary_to_gray(uint8_t num) {
+    return num ^ (num >> 1);
+}
+
+uint8_t prog1_gray(uint8_t* counter) {
+    return binary_to_gray(++(*counter));
+}
+
+uint8_t prog2_shift(uint8_t portValue, int* left) {
+    if (portValue & 0x80) *left = 0;
+    if (portValue & 0x01) *left = 1;
+    return (*left) ? (portValue << 1) : (portValue >> 1);
+}
+
+int get_delay(unsigned int adc_val) {
+    if (adc_val < 200) return 100000;
+    if (adc_val < 400) return 200000;
+    if (adc_val < 600) return 300000;
+    if (adc_val < 800) return 400000;
+    return 500000;
+}
+
+void init() {
+    ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
+    ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
+
+    TRISA = 0x0000;
+    LATA = 0x00;
+    
+    TRISDbits.TRISD6 = 1;  // RB3
+    TRISDbits.TRISD13 = 1; // RB4
+
+    AD1PCFG = 0xFFFF;
+}
+
+int main(void) {
+    init();
+    unsigned char currentProgram = 0;
+    unsigned char prevRB3 = 1, prevRB4 = 1;
+    unsigned char counter = 0x00;
+    unsigned char portValue = 0x01;
+    int left = 1;
+
+    while (1) {
+        unsigned int adc_val = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
+        if (adc_val == 0xFFFF) continue;
+        int delay = get_delay(adc_val);
+
+
+        unsigned char currRB3 = PORTDbits.RD6;
+        unsigned char currRB4 = PORTDbits.RD13;
+
+        if (prevRB3 == 1 && currRB3 == 0) {
+            currentProgram = (currentProgram + 1) % 2;
+            __delay32(300000);
+        }
+
+        if (prevRB4 == 1 && currRB4 == 0) {
+            currentProgram = (currentProgram == 0) ? 1 : 0;
+            __delay32(300000);
+        }
+
+        prevRB3 = currRB3;
+        prevRB4 = currRB4;
+
+
+        if (currentProgram == 0) {
+            portValue = prog1_gray(&counter);
+        } else {
+            portValue = prog2_shift(portValue, &left);
+        }
+
+        LATA = portValue;
+        __delay32(delay);
+    }
+
+    return 0;
+}
+
     
     return 0;
 }
