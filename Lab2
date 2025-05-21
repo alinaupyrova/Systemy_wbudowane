@@ -2,36 +2,36 @@
  * File:   newmainXC16.c
  * Author: local
  *
- * Created on April 17, 2025, 2:12 PM
+ * Created on April 17, 2025
  */
-// PIC24FJ128GA010 Configuration Bit Settings
 
-// 'C' source line config statements
+// CONFIGURATION BITS ---------------------------------------------
 
 // CONFIG2
-#pragma config POSCMOD = XT             // Primary Oscillator Select (XT Oscillator mode selected)
-#pragma config OSCIOFNC = ON            // Primary Oscillator Output Function (OSC2/CLKO/RC15 functions as port I/O (RC15))
-#pragma config FCKSM = CSDCMD           // Clock Switching and Monitor (Clock switching and Fail-Safe Clock Monitor are disabled)
-#pragma config FNOSC = PRI              // Oscillator Select (Primary Oscillator (XT, HS, EC))
-#pragma config IESO = ON                // Internal External Switch Over Mode (IESO mode (Two-Speed Start-up) enabled)
+#pragma config POSCMOD = XT
+#pragma config OSCIOFNC = ON
+#pragma config FCKSM = CSDCMD
+#pragma config FNOSC = PRI
+#pragma config IESO = ON
 
 // CONFIG1
-#pragma config WDTPS = PS32768          // Watchdog Timer Postscaler (1:32,768)
-#pragma config FWPSA = PR128            // WDT Prescaler (Prescaler ratio of 1:128)
-#pragma config WINDIS = ON              // Watchdog Timer Window (Standard Watchdog Timer enabled,(Windowed-mode is disabled))
-#pragma config FWDTEN = ON              // Watchdog Timer Enable (Watchdog Timer is enabled)
-#pragma config ICS = PGx2               // Comm Channel Select (Emulator/debugger uses EMUC2/EMUD2)
-#pragma config GWRP = OFF               // General Code Segment Write Protect (Writes to program memory are allowed)
-#pragma config GCP = OFF                // General Code Segment Code Protect (Code protection is disabled)
-#pragma config JTAGEN = OFF             // JTAG Port Enable (JTAG port is disabled)
+#pragma config WDTPS = PS32768
+#pragma config FWPSA = PR128
+#pragma config WINDIS = ON
+#pragma config FWDTEN = ON
+#pragma config ICS = PGx2
+#pragma config GWRP = OFF
+#pragma config GCP = OFF
+#pragma config JTAGEN = OFF
 
-// #pragma config statements should precede project file includes.
-// Use project enums instead of #define for ON and OFF.
+// INCLUDES --------------------------------------------------------
+
 #include "xc.h"
 #include "libpic30.h"
 #include "adc.h"
 #include "buttons.h"
 
+// ПРОГРАММА 1: счётчик в коде Грея
 uint8_t binary_to_gray(uint8_t num) {
     return num ^ (num >> 1);
 }
@@ -40,12 +40,14 @@ uint8_t prog1_gray(uint8_t* counter) {
     return binary_to_gray(++(*counter));
 }
 
+// ПРОГРАММА 2: бегущий бит влево/вправо
 uint8_t prog2_shift(uint8_t portValue, int* left) {
     if (portValue & 0x80) *left = 0;
     if (portValue & 0x01) *left = 1;
     return (*left) ? (portValue << 1) : (portValue >> 1);
 }
 
+// ПОЛУЧЕНИЕ ЗАДЕРЖКИ ОТ АЦП
 int get_delay(unsigned int adc_val) {
     if (adc_val < 200) return 100000;
     if (adc_val < 400) return 200000;
@@ -54,21 +56,27 @@ int get_delay(unsigned int adc_val) {
     return 500000;
 }
 
+// ИНИЦИАЛИЗАЦИЯ ПЕРИФЕРИИ
 void init() {
-    ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
-    ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
+    // Настройка пина RA2 (AN2) как аналогового входа
+    AD1PCFG = 0xFFFF;         // по умолчанию все цифровые
+    AD1PCFGbits.PCFG2 = 0;    // AN2 = аналоговый
 
-    TRISA = 0x0000;
+    TRISAbits.TRISA2 = 1;     // RA2 как вход
+    ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
+    ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER); // должен быть канал 2
+
+    TRISA = 0x0000;           // PORTA — выход
     LATA = 0x00;
 
-    TRISDbits.TRISD6 = 1;  // RD6 - next
-    TRISDbits.TRISD13 = 1; // RD13 - previous
-
-    AD1PCFG = 0xFFFF;
+    TRISDbits.TRISD6 = 1;     // RD6 — кнопка "следующий"
+    TRISDbits.TRISD13 = 1;    // RD13 — кнопка "предыдущий"
 }
 
+// ОСНОВНОЙ ЦИКЛ
 int main(void) {
     init();
+
     unsigned char currentProgram = 0;
     unsigned char prevRB3 = 1, prevRB4 = 1;
     unsigned char counter = 0x00;
@@ -76,18 +84,23 @@ int main(void) {
     int left = 1;
 
     while (1) {
+        // Чтение потенциометра
         unsigned int adc_val = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
-        if (adc_val == 0xFFFF) continue;
+        if (adc_val == 0xFFFF) continue;  // ошибка чтения
+
         int delay = get_delay(adc_val);
 
+        // Чтение кнопок
         unsigned char currRB3 = PORTDbits.RD6;
         unsigned char currRB4 = PORTDbits.RD13;
 
+        // Переключение вперёд
         if (prevRB3 == 1 && currRB3 == 0) {
             currentProgram = (currentProgram + 1) % 2;
-            __delay32(300000);
+            __delay32(300000); // антидребезг
         }
 
+        // Переключение назад
         if (prevRB4 == 1 && currRB4 == 0) {
             currentProgram = (currentProgram == 0) ? 1 : 0;
             __delay32(300000);
@@ -96,6 +109,7 @@ int main(void) {
         prevRB3 = currRB3;
         prevRB4 = currRB4;
 
+        // Выбор программы
         if (currentProgram == 0) {
             portValue = prog1_gray(&counter);
         } else {
@@ -108,16 +122,3 @@ int main(void) {
 
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
