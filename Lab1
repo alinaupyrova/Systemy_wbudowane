@@ -19,6 +19,7 @@
 #include "libpic30.h"
 #include "buttons.h"
 #include <stdlib.h>
+#include <stdint.h>
 
 uint8_t binary_to_gray(uint8_t num) {
     return num ^ (num >> 1);
@@ -32,10 +33,27 @@ uint8_t prog_logic(uint8_t program, uint8_t portValue, uint8_t* counter, uint8_t
         case 4: return binary_to_gray(--(*counter));
         case 5: return (((++(*counter)) / 10) << 4) | ((*counter) % 10);
         case 6: return (((--(*counter)) / 10) << 4) | ((*counter) % 10);
-        case 7:
-            if (portValue & 0x80) *left = 0;
-            if (portValue & 0x01) *left = 1;
-            return (*left) ? (portValue << 1) : (portValue >> 1);
+        case 7: {
+            static int pos = 0;
+            static char dir = 1;
+            uint8_t pattern = 0;
+
+            for (int i = 0; i < 3; i++) {
+                if ((pos + i) < 8) {
+                    pattern |= (1 << (pos + i));
+                }
+            }
+
+            if (dir) {
+                pos++;
+                if (pos >= 5) dir = 0;
+            } else {
+                pos--;
+                if (pos <= 0) dir = 1;
+            }
+
+            return pattern;
+        }
         case 8:
             if (*queue & 0x01)
                 *queue = 0x80;
@@ -95,5 +113,6 @@ int main(void) {
         if (prev13 == 1 && current13 == 0)
             change_program(&program, -1, &portValue, &counter, &queue);
     }
+
     return 0;
 }
