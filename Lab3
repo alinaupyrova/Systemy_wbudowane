@@ -1,1 +1,87 @@
+#include "xc.h"
+#include "libpic30.h"
+#include "adc.h"
 
+// Konfiguracja bitów konfiguracyjnych (zostawione zakomentowane, jeśli używasz MPLAB to one mogą być w pliku .gld lub GUI)
+// #pragma config POSCMOD = XT
+// #pragma config OSCIOFNC = ON
+// #pragma config FCKSM = CSDCMD
+// #pragma config FNOSC = PRI
+// #pragma config IESO = ON
+// #pragma config WDTPS = PS32768
+// #pragma config FWPSA = PR128
+// #pragma config WINDIS = ON
+// #pragma config FWDTEN = ON
+// #pragma config ICS = PGx2
+// #pragma config GWRP = OFF
+// #pragma config GCP = OFF
+// #pragma config JTAGEN = OFF
+
+void init(void) {
+    // Konfiguracja portów
+    TRISA = 0x0000;     // PORTA jako wyjście (diody)
+    LATA = 0x0000;
+
+    TRISDbits.TRISD6 = 1; // RD6 jako wejście (przycisk)
+
+    // Konfiguracja ADC
+    AD1PCFG = 0xFFFB; // AN2 jako wejście analogowe
+    TRISAbits.TRISA2 = 1;
+
+    ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
+    ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER); // AN2
+}
+
+int main(void) {
+    init();
+
+    unsigned int adc_val;
+    unsigned int threshold = 512; // połowa zakresu ADC
+    unsigned char alarm_active = 0;
+    unsigned long blink_time = 0;
+
+    while (1) {
+        adc_val = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
+        if (adc_val == 0xFFFF) continue; // błąd odczytu
+
+        // Przycisk RB3 (RD6) - ręczne wyłączenie alarmu
+        if (PORTDbits.RD6 == 0) {
+            alarm_active = 0;
+            LATA = 0x0000;
+            continue;
+        }
+
+        // Włącz alarm, jeśli przekroczony próg i nie jest już aktywny
+        if (!alarm_active && adc_val >= threshold) {
+            alarm_active = 1;
+            blink_time = 0;
+        }
+
+        // Jeśli alarm jest aktywny
+        if (alarm_active) {
+            if (adc_val < threshold) {
+                // Wyłącz alarm jeśli napięcie spadło poniżej progu
+                alarm_active = 0;
+                LATA = 0x0000;
+                continue;
+            }
+
+            if (blink_time < 5000000UL) {
+                // Mruganie przez 5 sekund
+                LATA = 0x0001;
+                __delay32(62500); // ok. 50ms
+                LATA = 0x0000;
+                __delay32(62500);
+                blink_time += 125000;
+            } else {
+                // Po 5 sekundach świecą się wszystkie diody
+                LATA = 0xFFFF;
+            }
+        } else {
+            // Normalny stan - diody wyłączone
+            LATA = 0x0000;
+        }
+    }
+
+    return 0;
+}
