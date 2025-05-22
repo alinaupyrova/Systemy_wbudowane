@@ -1,136 +1,88 @@
-/*
- * File:   newmainXC16.c
- * Author: local
- *
- * Created on April 24, 2025, 1:31 PM
- */
-
-// PIC24FJ128GA010 Configuration Bit Settings
-
-// 'C' source line config statements
-
-// CONFIG2
-#pragma config POSCMOD = XT             // Primary Oscillator Select (XT Oscillator mode selected)
-#pragma config OSCIOFNC = ON            // Primary Oscillator Output Function (OSC2/CLKO/RC15 functions as port I/O (RC15))
-#pragma config FCKSM = CSDCMD           // Clock Switching and Monitor (Clock switching and Fail-Safe Clock Monitor are disabled)
-#pragma config FNOSC = PRI              // Oscillator Select (Primary Oscillator (XT, HS, EC))
-#pragma config IESO = ON                // Internal External Switch Over Mode (IESO mode (Two-Speed Start-up) enabled)
-
-// CONFIG1
-#pragma config WDTPS = PS32768          // Watchdog Timer Postscaler (1:32,768)
-#pragma config FWPSA = PR128            // WDT Prescaler (Prescaler ratio of 1:128)
-#pragma config WINDIS = ON              // Watchdog Timer Window (Standard Watchdog Timer enabled,(Windowed-mode is disabled))
-#pragma config FWDTEN = ON              // Watchdog Timer Enable (Watchdog Timer is enabled)
-#pragma config ICS = PGx2               // Comm Channel Select (Emulator/debugger uses EMUC2/EMUD2)
-#pragma config GWRP = OFF               // General Code Segment Write Protect (Writes to program memory are allowed)
-#pragma config GCP = OFF                // General Code Segment Code Protect (Code protection is disabled)
-#pragma config JTAGEN = OFF             // JTAG Port Enable (JTAG port is disabled)
-
-// #pragma config statements should precede project file includes.
-// Use project enums instead of #define for ON and OFF.
+#pragma config POSCMOD = XT
+#pragma config OSCIOFNC = ON
+#pragma config FCKSM = CSDCMD
+#pragma config FNOSC = PRI
+#pragma config IESO = ON
+#pragma config WDTPS = PS32768
+#pragma config FWPSA = PR128
+#pragma config WINDIS = ON
+#pragma config FWDTEN = ON
+#pragma config ICS = PGx2
+#pragma config GWRP = OFF
+#pragma config GCP = OFF
+#pragma config JTAGEN = OFF
 
 #include "xc.h"
-#include "lcd.h"
+#include "libpic30.h"
+#include "adc.h"
 #include "buttons.h"
-#include "string.h"
-void system_init(void){
-    LCD_Initialize();
-    
-    BUTTON_Enable(BUTTON_S3);
-    BUTTON_Enable(BUTTON_S4);
-    BUTTON_Enable(BUTTON_S5);
-    BUTTON_Enable(BUTTON_S6);
-}
-void display_start_screen(void){
-    LCD_ClearScreen();
-    LCD_PutString("DOBRY DZIEN",11);
-    LCD_PutChar('\n');
-    LCD_PutString("EKRAN LCD",9);
-    
-}
+#include <stdlib.h>
 
-void flashLEDs(){
-    AD1PCFG = 0xFFFF;
-    TRISA = 0x0000;
-    LATA = 0xFFFF;
+// Конфигурация системы
+void configure_system(void) {
+    TRISA = 0x0000;    // Все порты PORTA как выходы (для светодиодов)
+    TRISB |= (1 << 3);  // RB3 как вход (кнопка отключения)
+    AD1PCFG = 0xFFFB;   // Конфигурация аналоговых входов (AN2 как аналоговый)
     
-}
-void displayText(void){
-    const char* dni[] = {"czwartek","sroda"};
-    int dzienIndex = 0;
-    LCD_ClearScreen();
-    LCD_PutString("Wybierz dzien",13);
-    LCD_PutChar('\n');
-    LCD_PutString("dzien: ",7);
-    LCD_PutString(dni[dzienIndex],strlen(dni[dzienIndex]));
+    ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
+    ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER); // AN2
     
-    __delay32(1000000);
-    while(1){
-        if(BUTTON_IsPressed(BUTTON_S5)){
-            mainMenu();
-            return;
-        }
-        if(BUTTON_IsPressed(BUTTON_S4)){
-            dzienIndex = (dzienIndex+1)%2;
-            
-            LCD_ClearScreen();
-            LCD_PutString("Wybierz dzien",13);
-            LCD_PutChar('\n');
-            LCD_PutString("dzien: ",7);
-            LCD_PutString(dni[dzienIndex], strlen(dni[dzienIndex]));
-            
-            __delay32(400000);
-            while(BUTTON_IsPressed(BUTTON_S4));
-            
-            
-        }
-        if(BUTTON_IsPressed(BUTTON_S6)){
-            LCD_ClearScreen();
-            LCD_PutString("Wybrano: ",9);
-            LCD_PutString(dni[dzienIndex],strlen(dni[dzienIndex]));
-            
-            flashLEDs();
-            __delay32(500000);
-        }
-        
-        if(BUTTON_IsPressed(BUTTON_S3)){
-            
-            LATA = 0x0000;
-            LCD_ClearScreen();
-            LCD_PutString("Wyjscie", 7);
-            __delay32(1000000);
-            return;
-        }
-        
-        
-    }
+    LATA = 0x0000;      // Изначально все светодиоды выключены
 }
-void mainMenu(void){
-    display_start_screen();
-    while(1){
-        __delay32(1400000);
-        if(BUTTON_IsPressed(BUTTON_S5)){
-            displayText();
-            return;
-        }else if(BUTTON_IsPressed(BUTTON_S4)){
-            displayText();
-            return;
-        }else if(BUTTON_IsPressed(BUTTON_S3)){
-            break;
-        }
-    }
-    
-}
-
 
 int main(void) {
-    system_init();
-    mainMenu();
-    while(1){
+    unsigned int alarm_threshold = 512; // Порог срабатывания (половина диапазона)
+    int alarm_triggered = 0;           // Флаг состояния тревоги
+    int blinking_phase = 0;            // Флаг фазы мигания
+    unsigned long blink_timer = 0;     // Таймер мигания
+    unsigned long blink_counter = 0;   // Счетчик миганий
+    
+    configure_system();
+
+    while (1) {
+        // Чтение значения с потенциометра
+        unsigned int pot_value = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
         
+        // Проверка на срабатывание тревоги
+        if (!alarm_triggered && pot_value > alarm_threshold) {
+            alarm_triggered = 1;
+            blinking_phase = 1;
+            blink_timer = 0;
+            blink_counter = 0;
+        }
         
+        // Если тревога активирована
+        if (alarm_triggered) {
+            // Проверка условий отключения тревоги
+            if (pot_value <= alarm_threshold || (PORTB & (1 << 3)) {
+                alarm_triggered = 0;
+                blinking_phase = 0;
+                LATA = 0x0000; // Выключить все светодиоды
+                continue;
+            }
+            
+            // Фаза мигания (первые 5 секунд)
+            if (blinking_phase) {
+                if (blink_counter % 2 == 0) {
+                    LATA = 0b00000001; // Включить один светодиод (RA0)
+                } else {
+                    LATA = 0x0000;      // Выключить все
+                }
+                
+                __delay32(500000);      // Задержка 0.5 секунды
+                blink_counter++;
+                blink_timer += 500000;
+                
+                // После 5 секунд переходим к постоянному свечению
+                if (blink_timer >= 5000000) { // 5 секунд
+                    blinking_phase = 0;
+                    LATA = 0xFFFF; // Включить все светодиоды
+                }
+            }
+        } else {
+            LATA = 0x0000; // Тревога не активирована - все светодиоды выключены
+        }
     }
-    
-    
+
     return 0;
 }
