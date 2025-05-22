@@ -18,67 +18,54 @@
 // #pragma config JTAGEN = OFF
 
 void init(void) {
-    // Konfiguracja portów
-    TRISA = 0x0000;     // PORTA jako wyjście (diody)
+    TRISA = 0x0000;
     LATA = 0x0000;
-
-    TRISDbits.TRISD6 = 1; // RD6 jako wejście (przycisk)
-
-    // Konfiguracja ADC
-    AD1PCFG = 0xFFFF; // AN2 jako wejście analogowe
+    TRISDbits.TRISD6 = 1;
+    AD1PCFG = 0xFFFF;
     TRISAbits.TRISA2 = 1;
-
     ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
-    ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER); // AN2
+    ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
 }
 
 int main(void) {
     init();
-
     unsigned int adc_val;
-    unsigned int threshold = 512; // połowa zakresu ADC
+    unsigned int threshold = 512;
     unsigned char alarm_active = 0;
     unsigned long blink_time = 0;
 
     while (1) {
         adc_val = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
-        if (adc_val == 0xFFFF) continue; // błąd odczytu
+        if (adc_val == 0xFFFF) continue;
 
-        // Przycisk RB3 (RD6) - ręczne wyłączenie alarmu
         if (PORTDbits.RD6 == 0) {
             alarm_active = 0;
             LATA = 0x0000;
             continue;
         }
 
-        // Włącz alarm, jeśli przekroczony próg i nie jest już aktywny
         if (!alarm_active && adc_val >= threshold) {
             alarm_active = 1;
             blink_time = 0;
         }
 
-        // Jeśli alarm jest aktywny
         if (alarm_active) {
             if (adc_val < threshold) {
-                // Wyłącz alarm jeśli napięcie spadło poniżej progu
                 alarm_active = 0;
                 LATA = 0x0000;
                 continue;
             }
 
             if (blink_time < 5000000UL) {
-                // Mruganie przez 5 sekund
-                LATA = 0x0001;
-                __delay32(62500); // ok. 50ms
+                LATA = 0b11101111;
+                __delay32(62500);
                 LATA = 0x0000;
                 __delay32(62500);
                 blink_time += 125000;
             } else {
-                // Po 5 sekundach świecą się wszystkie diody
-                LATA = 0xFFFF;
+                LATA = 0b11101111;
             }
         } else {
-            // Normalny stan - diody wyłączone
             LATA = 0x0000;
         }
     }
