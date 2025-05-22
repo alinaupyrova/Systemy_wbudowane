@@ -27,10 +27,26 @@ uint8_t prog1_gray(uint8_t* counter) {
     return binary_to_gray(*counter);
 }
 
-uint8_t prog2_shift(uint8_t value, int* left) {
-    if (value & 0x80) *left = 0;
-    if (value & 0x01) *left = 1;
-    return (*left) ? (value << 1) : (value >> 1);
+uint8_t prog2_snake(void) {
+    static int pos = 0;
+    static char dir = 1;
+    uint8_t pattern = 0;
+
+    for (int i = 0; i < 3; i++) {
+        if ((pos + i) < 8) {
+            pattern |= (1 << (pos + i));
+        }
+    }
+
+    if (dir) {
+        pos++;
+        if (pos >= 5) dir = 0;
+    } else {
+        pos--;
+        if (pos <= 0) dir = 1;
+    }
+
+    return pattern;
 }
 
 unsigned char read_speed_level(unsigned int adc_val) {
@@ -64,7 +80,6 @@ int main(void) {
     uint8_t program = 0;
     uint8_t counter = 0x00;
     uint8_t portValue = 0x01;
-    int left = 1;
 
     uint8_t prevRD6 = 1, prevRD13 = 1;
 
@@ -79,29 +94,17 @@ int main(void) {
         uint8_t currRD13 = PORTDbits.RD13;
 
         if (prevRD6 == 1 && currRD6 == 0) {
-            program++;
-            if (program > 1) program = 0;
+            program = (program + 1) % 2;
             __delay32(300000);
-            if (program == 0) {
-                counter = 0;
-                portValue = 0x01;
-            } else if (program == 1) {
-                portValue = 0x01;
-                left = 1;
-            }
+            counter = 0;
+            portValue = 0x01;
         }
 
         if (prevRD13 == 1 && currRD13 == 0) {
-            if (program == 0) program = 1;
-            else program = 0;
+            program = (program == 0) ? 1 : 0;
             __delay32(300000);
-            if (program == 0) {
-                counter = 0;
-                portValue = 0x01;
-            } else if (program == 1) {
-                portValue = 0x01;
-                left = 1;
-            }
+            counter = 0;
+            portValue = 0x01;
         }
 
         prevRD6 = currRD6;
@@ -110,7 +113,7 @@ int main(void) {
         if (program == 0) {
             portValue = prog1_gray(&counter);
         } else {
-            portValue = prog2_shift(portValue, &left);
+            portValue = prog2_snake();
         }
 
         LATA = portValue;
