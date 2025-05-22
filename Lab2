@@ -24,6 +24,7 @@ uint8_t binary_to_gray(uint8_t num) {
 
 uint8_t prog1_gray(uint8_t* counter) {
     (*counter)++;
+    if (*counter > 255) *counter = 0;
     return binary_to_gray(*counter);
 }
 
@@ -50,16 +51,16 @@ uint8_t prog2_snake(void) {
 }
 
 unsigned char read_speed_level(unsigned int adc_val) {
-    return adc_val / 200 > 4 ? 4 : adc_val / 200;
+    return (adc_val / 200 > 4) ? 4 : adc_val / 200;
 }
 
 unsigned long get_delay_from_level(unsigned char level) {
     switch (level) {
-        case 0: return 250000;
-        case 1: return 500000;
+        case 0: return 1250000;
+        case 1: return 1000000;
         case 2: return 750000;
-        case 3: return 1000000;
-        default: return 1250000;
+        case 3: return 500000;
+        default: return 250000;
     }
 }
 
@@ -68,8 +69,7 @@ void init(void) {
     LATA = 0x00;
     TRISDbits.TRISD6 = 1;
     TRISDbits.TRISD13 = 1;
-    TRISAbits.TRISA2 = 1;
-    AD1PCFG = 0xFFFB;
+    AD1PCFG = 0xFFFF; // Все порты как цифровые
     ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
     ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
 }
