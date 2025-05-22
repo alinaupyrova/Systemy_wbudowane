@@ -1,72 +1,77 @@
+#pragma config POSCMOD = XT
+#pragma config OSCIOFNC = ON
+#pragma config FCKSM = CSDCMD
+#pragma config FNOSC = PRI
+#pragma config IESO = ON
+#pragma config WDTPS = PS32768
+#pragma config FWPSA = PR128
+#pragma config WINDIS = ON
+#pragma config FWDTEN = ON
+#pragma config ICS = PGx2
+#pragma config GWRP = OFF
+#pragma config GCP = OFF
+#pragma config JTAGEN = OFF
+
 #include "xc.h"
 #include "libpic30.h"
 #include "adc.h"
+#include "buttons.h"
+#include <stdlib.h>
 
-// Konfiguracja bitów konfiguracyjnych (zostawione zakomentowane, jeśli używasz MPLAB to one mogą być w pliku .gld lub GUI)
-// #pragma config POSCMOD = XT
-// #pragma config OSCIOFNC = ON
-// #pragma config FCKSM = CSDCMD
-// #pragma config FNOSC = PRI
-// #pragma config IESO = ON
-// #pragma config WDTPS = PS32768
-// #pragma config FWPSA = PR128
-// #pragma config WINDIS = ON
-// #pragma config FWDTEN = ON
-// #pragma config ICS = PGx2
-// #pragma config GWRP = OFF
-// #pragma config GCP = OFF
-// #pragma config JTAGEN = OFF
-
-void init(void) {
+void configure_system(void) {
     TRISA = 0x0000;
-    LATA = 0x0000;
-    TRISDbits.TRISD6 = 1;
-    AD1PCFG = 0xFFFF;
-    TRISAbits.TRISA2 = 1;
+    TRISB |= (1 << 3) | (1 << 4);
+    AD1PCFG = 0xFFFB;
     ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
     ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
 }
 
 int main(void) {
-    init();
-    unsigned int adc_val;
-    unsigned int threshold = 512;
-    unsigned char alarm_active = 0;
-    unsigned long blink_time = 0;
+    uint8_t output_state = 0x00;
+    int is_alarm_triggered = 0;
+    int is_blinking_phase = 0;
+    unsigned long blink_toggle_counter = 0;
+    unsigned long blink_timer = 0;
+
+    configure_system();
 
     while (1) {
-        adc_val = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
-        if (adc_val == 0xFFFF) continue;
+        unsigned int pot_value = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
+        if (pot_value == 0xFFFF) continue;
 
-        if (PORTDbits.RD6 == 0) {
-            alarm_active = 0;
-            LATA = 0x0000;
-            continue;
+        if (!is_alarm_triggered && pot_value < 512) {
+            is_alarm_triggered = 1;
+            is_blinking_phase = 1;
+            blink_toggle_counter = 0;
+            blink_timer = 0;
         }
 
-        if (!alarm_active && adc_val >= threshold) {
-            alarm_active = 1;
-            blink_time = 0;
-        }
-
-        if (alarm_active) {
-            if (adc_val < threshold) {
-                alarm_active = 0;
-                LATA = 0x0000;
+        if (is_alarm_triggered) {
+            if (pot_value >= 512 || PORTDbits.RD13 == 0) {
+                is_alarm_triggered = 0;
+                LATA = 0x00;
                 continue;
             }
 
-            if (blink_time < 5000000UL) {
-                LATA = 0b11101111;
-                __delay32(62500);
-                LATA = 0x0000;
-                __delay32(62500);
-                blink_time += 125000;
+            if (is_blinking_phase) {
+                if (blink_toggle_counter % 2) {
+                    LATA = 0b11101111;
+                } else {
+                    LATA = 0x00;
+                }
+
+                __delay32(1000000);
+                blink_toggle_counter++;
+                blink_timer += 1000000;
+
+                if (blink_timer >= 5000000) {
+                    is_blinking_phase = 0;
+                }
             } else {
                 LATA = 0b11101111;
             }
         } else {
-            LATA = 0x0000;
+            LATA = 0x00;
         }
     }
 
