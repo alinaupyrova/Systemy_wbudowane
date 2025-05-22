@@ -50,13 +50,10 @@ unsigned long get_delay_from_level(unsigned char level) {
 void init(void) {
     TRISA = 0x0000;
     LATA = 0x00;
-
     TRISDbits.TRISD6 = 1;
     TRISDbits.TRISD13 = 1;
-
     TRISAbits.TRISA2 = 1;
     AD1PCFG = 0xFFFB;
-
     ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
     ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
 }
@@ -82,13 +79,29 @@ int main(void) {
         uint8_t currRD13 = PORTDbits.RD13;
 
         if (prevRD6 == 1 && currRD6 == 0) {
-            program = (program + 1) % 2;
+            program++;
+            if (program > 1) program = 0;
             __delay32(300000);
+            if (program == 0) {
+                counter = 0;
+                portValue = 0x01;
+            } else if (program == 1) {
+                portValue = 0x01;
+                left = 1;
+            }
         }
 
         if (prevRD13 == 1 && currRD13 == 0) {
-            program = (program == 0) ? 1 : 0;
+            if (program == 0) program = 1;
+            else program = 0;
             __delay32(300000);
+            if (program == 0) {
+                counter = 0;
+                portValue = 0x01;
+            } else if (program == 1) {
+                portValue = 0x01;
+                left = 1;
+            }
         }
 
         prevRD6 = currRD6;
