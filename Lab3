@@ -25,7 +25,7 @@ void init(void) {
     TRISDbits.TRISD6 = 1; // RD6 jako wejście (przycisk)
 
     // Konfiguracja ADC
-    AD1PCFG = 0xFFFB; // AN2 jako wejście analogowe
+    AD1PCFG = 0xFFFF; // AN2 jako wejście analogowe
     TRISAbits.TRISA2 = 1;
 
     ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
