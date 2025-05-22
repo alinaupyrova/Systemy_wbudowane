@@ -17,27 +17,20 @@
 #include "adc.h"
 #include "buttons.h"
 
-// Конфигурация системы
 void configure_system(void) {
-    // Настройка портов
-    TRISA = 0x0000;    // Все порты PORTA как выходы (для светодиодов)
-    TRISB |= (1 << 3);  // RB3 как вход (кнопка отключения)
-    
-    // Настройка АЦП
-    AD1PCFG = 0xFFFB;   // AN2 (RB2) как аналоговый вход
+    TRISA = 0x0000;
+    TRISB |= (1 << 3);
+    AD1PCFG = 0xFFFB;
     ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
     ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
-    
-    LATA = 0x0000;      // Изначально все светодиоды выключены
+    LATA = 0x0000;
 }
 
 int main(void) {
-    // Константы
-    const unsigned int ALARM_THRESHOLD = 512;  // Порог срабатывания (половина диапазона 10-бит АЦП)
-    const unsigned long BLINK_INTERVAL = 500000; // Интервал мигания 0.5 сек
-    const unsigned long BLINK_PHASE_DURATION = 5000000; // Длительность фазы мигания 5 сек
+    const unsigned int ALARM_THRESHOLD = 512;
+    const unsigned long BLINK_INTERVAL = 500000;
+    const unsigned long BLINK_PHASE_DURATION = 5000000;
     
-    // Переменные состояния
     int alarm_triggered = 0;
     int blinking_phase = 0;
     unsigned long time_counter = 0;
@@ -45,47 +38,39 @@ int main(void) {
     configure_system();
 
     while (1) {
-        // Чтение значения с потенциометра
         unsigned int pot_value = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
         
-        // Проверка на срабатывание тревоги
         if (!alarm_triggered && pot_value > ALARM_THRESHOLD) {
             alarm_triggered = 1;
             blinking_phase = 1;
             time_counter = 0;
         }
         
-        // Обработка активной тревоги
         if (alarm_triggered) {
-            // Проверка условий отключения тревоги
             if (pot_value <= ALARM_THRESHOLD || (PORTB & (1 << 3))) {
                 alarm_triggered = 0;
                 blinking_phase = 0;
-                LATA = 0x0000; // Выключить все светодиоды
+                LATA = 0x0000;
                 continue;
             }
             
-            // Фаза мигания (первые 5 секунд)
             if (blinking_phase) {
-                // Мигаем 5-й диодом (RA4) - бит 4
                 if ((time_counter / BLINK_INTERVAL) % 2) {
-                    LATA = 0x0010; // Включить только RA4
+                    LATA = 0x0010;
                 } else {
-                    LATA = 0x0000; // Выключить все
+                    LATA = 0x0000;
                 }
                 
-                // Обновление таймера
-                __delay32(100000); // Шаг 0.1 сек для более точного управления
+                __delay32(100000);
                 time_counter += 100000;
                 
-                // Проверка окончания фазы мигания
                 if (time_counter >= BLINK_PHASE_DURATION) {
                     blinking_phase = 0;
-                    LATA = 0xFFFF; // Включить все светодиоды
+                    LATA = 0xFFFF;
                 }
             }
         } else {
-            LATA = 0x0000; // Тревога не активирована - все светодиоды выключены
+            LATA = 0x0000;
         }
     }
 
