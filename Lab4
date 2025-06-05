@@ -1,3 +1,18 @@
+// Konfiguracja bitów PIC24FJ128GA010
+#pragma config POSCMOD = XT
+#pragma config OSCIOFNC = ON
+#pragma config FCKSM = CSDCMD
+#pragma config FNOSC = PRI
+#pragma config IESO = ON
+#pragma config WDTPS = PS32768
+#pragma config FWPSA = PR128
+#pragma config WINDIS = ON
+#pragma config FWDTEN = OFF
+#pragma config ICS = PGx2
+#pragma config GWRP = OFF
+#pragma config GCP = OFF
+#pragma config JTAGEN = OFF
+
 #include <xc.h>
 #include "lcd.h"
 #include "libpic30.h"
@@ -5,9 +20,9 @@
 #include <string.h>
 
 #define FCY 4000000UL
-#define SYMBOL_HEART 0
+#define HEART 0
 
-const uint8_t heart_symbol[8] = {
+const uint8_t char_data_heart[8] = {
     0b01010,
     0b11111,
     0b11111,
@@ -18,22 +33,23 @@ const uint8_t heart_symbol[8] = {
     0b00000
 };
 
+// Tekst bez niedozwolonych znaków (♥ dodajemy osobno)
+const char reklama[] = " Kup PIC – programuj z mocą! 🔧   ";
+
 void delay_ms(unsigned long ms) {
     __delay32((FCY / 1000) * ms);
 }
 
-const char reklama[] = "  Kup PIC – programuj z mocą!   ";
-
-void wyswietl_reklame(const char *tekst) {
+void wyswietl_przesuwany_tekst(const char* tekst) {
     char bufor[17];
-    size_t len = strlen(tekst);
+    size_t dl = strlen(tekst);
 
-    for (size_t i = 0; i < len - 15; i++) {
-        strncpy(bufor, &tekst[i], 15); // 15 znaków na tekst, 1 na serce
+    for (size_t i = 0; i <= dl - 15; i++) {
+        strncpy(bufor, &tekst[i], 15);
         bufor[15] = '\0';
 
         LCD_ClearScreen();
-        LCD_PutChar(SYMBOL_HEART); // ♥ przed tekstem
+        LCD_PutChar(HEART);  // Dodajemy serduszko przed tekstem
         LCD_PutString(bufor, strlen(bufor));
         delay_ms(300);
     }
@@ -43,23 +59,16 @@ int main(void) {
     LCD_Initialize();
     LCD_ClearScreen();
 
-    LCD_CreateChar(SYMBOL_HEART, heart_symbol);
+    LCD_CreateChar(HEART, char_data_heart);
+    TRISA = 0x0000;
 
-    LCD_PutChar(SYMBOL_HEART);
-    LCD_PutString(" Witaj w PIC!", 14);
+    LCD_PutChar(HEART);
+    LCD_PutString(" Reklama PIC", 13);
     delay_ms(1500);
 
     while (1) {
-        wyswietl_reklame(reklama);
+        wyswietl_przesuwany_tekst(reklama);
     }
 
     return 0;
 }
-
-
-make[2]: Leaving directory 'D:/169407/mplab3.X'
-make[2]: *** [nbproject/Makefile-default.mk:148: dist/default/debug/mplab3.X.debug.elf] Error 255
-make[1]: *** [nbproject/Makefile-default.mk:85: .build-conf] Error 2
-make: *** [nbproject/Makefile-impl.mk:39: .build-impl] Error 2
-
-BUILD FAILED (exit value 2, total time: 508ms)
