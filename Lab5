@@ -20,6 +20,7 @@
 #include "libpic30.h"
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #define FCY 4000000UL
 #define BUTTON_P1 BUTTON_S5  // RB3 — gracz 1
@@ -107,23 +108,19 @@ void show_player_time(unsigned long p1, unsigned long p2, uint8_t current) {
 
 void show_winner(uint8_t loser) {
     LCD_ClearScreen();
-
     if (loser == 1) {
         LCD_PutString("Gracz 1 -> czas!", 17);
     } else {
         LCD_PutString("Gracz 2 -> czas!", 17);
     }
-
     LCD_PutChar('\n');
     LCD_PutString("Koniec gry", 10);
-
     while (1);
 }
 
 int main(void) {
     LCD_Initialize();
     LCD_ClearScreen();
-
     LCD_CreateChar(DOWN_ARROW, char_data_down_arrow);
 
     BUTTON_Enable(BUTTON_P1);
@@ -143,7 +140,6 @@ int main(void) {
 
     unsigned long player1_time = start_time_min * 60000;
     unsigned long player2_time = start_time_min * 60000;
-
     uint8_t current_player = 1;
 
     LCD_ClearScreen();
@@ -155,12 +151,22 @@ int main(void) {
         delay_ms(100);
     }
 
+    bool prev_p1_state = false;
+    bool prev_p2_state = false;
+
     while (1) {
-        if (BUTTON_IsPressed(BUTTON_P1)) {
+        bool curr_p1 = BUTTON_IsPressed(BUTTON_P1);
+        bool curr_p2 = BUTTON_IsPressed(BUTTON_P2);
+
+        if (curr_p1 && !prev_p1_state) {
             current_player = 2;
-        } else if (BUTTON_IsPressed(BUTTON_P2)) {
+        }
+        if (curr_p2 && !prev_p2_state) {
             current_player = 1;
         }
+
+        prev_p1_state = curr_p1;
+        prev_p2_state = curr_p2;
 
         show_player_time(player1_time, player2_time, current_player);
         delay_ms(1000);
@@ -174,7 +180,6 @@ int main(void) {
         if (player1_time == 0) {
             show_winner(1);
         }
-
         if (player2_time == 0) {
             show_winner(2);
         }
