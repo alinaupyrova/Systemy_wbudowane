@@ -94,4 +94,4 @@ void LCD_ClearScreen(void);
 *
 ********************************************************************/
 void LCD_CursorEnable(bool enable);
-void LCD_CreateChar()
+void LCD_CreateChar(uint8_t location, const uint8_t *charmap);
