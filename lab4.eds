@@ -430,4 +430,21 @@ void LCD_CursorEnable ( bool enable )
         LCD_SendCommand ( LCD_COMMAND_CURSOR_OFF , LCD_F_INSTR ) ;
     }
 }
+void LCD_CreateChar(uint8_t location, const uint8_t *charmap)
+{
+    uint8_t i;
+
+    location &= 0x07; // tylko 8 pozycji (0–7)
+    LCD_SendCommand(0x40 | (location << 3), LCD_F_INSTR); // ustaw adres CGRAM
+
+    for (i = 0; i < 8; i++) {
+        LCD_SendData(charmap[i]); // wpisz linijkę znaku
+    }
+
+    // Przywróć pozycję kursora (opcjonalnie)
+    if (row == 0)
+        LCD_SendCommand(LCD_COMMAND_ROW_0_HOME + column, LCD_F_INSTR);
+    else
+        LCD_SendCommand(LCD_COMMAND_ROW_1_HOME + column, LCD_F_INSTR);
+}
 
