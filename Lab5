@@ -1,0 +1,166 @@
+#pragma config POSCMOD = XT
+#pragma config OSCIOFNC = ON
+#pragma config FCKSM = CSDCMD
+#pragma config FNOSC = PRI
+#pragma config IESO = ON
+#pragma config WDTPS = PS32768
+#pragma config FWPSA = PR128
+#pragma config WINDIS = ON
+#pragma config FWDTEN = OFF
+#pragma config ICS = PGx2
+#pragma config GWRP = OFF
+#pragma config GCP = OFF
+#pragma config JTAGEN = OFF
+
+#include <xc.h>
+#include "lcd.h"
+#include "buttons.h"
+#include "adc.h"
+#include "libpic30.h"
+#include <stdint.h>
+#include <stdbool.h>
+
+#define FCY 4000000UL
+#define BUTTON_GRACZ1 BUTTON_S4 // zgodnie z RB3
+#define BUTTON_GRACZ2 BUTTON_S6 // zgodnie z RB5
+#define BUTTON_OK     BUTTON_S3 // dowolny – do wyboru czasu
+
+#define STRZALKA 0
+#define SERCE 1
+
+const uint8_t znak_serca[8] = {
+    0b01010, 0b11111, 0b11111, 0b01110,
+    0b00100, 0b00000, 0b00000, 0b00000
+};
+
+const uint8_t znak_strzalki[8] = {
+    0b00100, 0b00100, 0b11111, 0b01110,
+    0b00100, 0b00000, 0b00000, 0b00000
+};
+
+void delay_ms(unsigned long ms) {
+    __delay32((FCY / 1000) * ms);
+}
+
+void wypisz_czas(unsigned long ms, char* buf) {
+    unsigned int min = ms / 60000;
+    unsigned int sec = (ms % 60000) / 1000;
+    sprintf(buf, "%02u:%02u", min, sec);
+}
+
+unsigned int wybierz_czas() {
+    unsigned int czas = 3;
+    while (1) {
+        LCD_ClearScreen();
+        LCD_PutString("Ustaw czas:", 11);
+        LCD_PutChar('\n');
+
+        unsigned int pot = ADC_Read10bit(ADC_CHANNEL_POTENTIOMETER);
+        if (pot == 0xFFFF) continue;
+
+        if (pot < 341) {
+            czas = 1;
+            LCD_PutString("1 minuta", 8);
+        } else if (pot < 682) {
+            czas = 3;
+            LCD_PutString("3 minuty", 8);
+        } else {
+            czas = 5;
+            LCD_PutString("5 minut", 7);
+        }
+
+        delay_ms(500);
+        if (BUTTON_IsPressed(BUTTON_OK)) break;
+    }
+    return czas;
+}
+
+void odliczanie_startowe() {
+    for (int i = 3; i > 0; i--) {
+        LCD_ClearScreen();
+        LCD_PutString("Start za ", 9);
+        LCD_PutChar('0' + i);
+        delay_ms(1000);
+    }
+}
+
+void pokaz_czas(unsigned long t1, unsigned long t2, uint8_t aktywny) {
+    char buf[6];
+    LCD_ClearScreen();
+
+    if (aktywny == 1) {
+        LCD_PutChar(STRZALKA);
+        LCD_PutString("G1: ", 4);
+        wypisz_czas(t1, buf);
+        LCD_PutString(buf, 5);
+        LCD_PutChar('\n');
+        LCD_PutString(" G2: ", 5);
+        wypisz_czas(t2, buf);
+        LCD_PutString(buf, 5);
+    } else {
+        LCD_PutString(" G1: ", 5);
+        wypisz_czas(t1, buf);
+        LCD_PutString(buf, 5);
+        LCD_PutChar('\n');
+        LCD_PutChar(STRZALKA);
+        LCD_PutString("G2: ", 4);
+        wypisz_czas(t2, buf);
+        LCD_PutString(buf, 5);
+    }
+}
+
+void pokaz_przegrana(uint8_t przegrany) {
+    LCD_ClearScreen();
+    if (przegrany == 1)
+        LCD_PutString("Gracz 1 przegral!", 18);
+    else
+        LCD_PutString("Gracz 2 przegral!", 18);
+
+    LCD_PutChar('\n');
+    LCD_PutChar(SERCE);
+    LCD_PutString("Koniec gry", 10);
+    while (1);
+}
+
+int main(void) {
+    LCD_Initialize();
+    LCD_ClearScreen();
+
+    LCD_CreateChar(STRZALKA, znak_strzalki);
+    LCD_CreateChar(SERCE, znak_serca);
+
+    BUTTON_Enable(BUTTON_GRACZ1);
+    BUTTON_Enable(BUTTON_GRACZ2);
+    BUTTON_Enable(BUTTON_OK);
+
+    ADC_SetConfiguration(ADC_CONFIGURATION_DEFAULT);
+    ADC_ChannelEnable(ADC_CHANNEL_POTENTIOMETER);
+    TRISA = 0x0000;
+
+    LCD_PutChar(SERCE);
+    LCD_PutString(" Zegar SD Szachy", 17);
+    delay_ms(1500);
+
+    unsigned int minuty = wybierz_czas();
+    odliczanie_startowe();
+
+    unsigned long czas1 = minuty * 60000;
+    unsigned long czas2 = minuty * 60000;
+    uint8_t gracz = 1;
+
+    while (1) {
+        if (BUTTON_IsPressed(BUTTON_GRACZ1)) gracz = 2;
+        if (BUTTON_IsPressed(BUTTON_GRACZ2)) gracz = 1;
+
+        pokaz_czas(czas1, czas2, gracz);
+        delay_ms(1000);
+
+        if (gracz == 1 && czas1 > 0) czas1 -= 1000;
+        if (gracz == 2 && czas2 > 0) czas2 -= 1000;
+
+        if (czas1 == 0) pokaz_przegrana(1);
+        if (czas2 == 0) pokaz_przegrana(2);
+    }
+
+    return 0;
+}
