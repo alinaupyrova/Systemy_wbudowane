@@ -1,0 +1,58 @@
+// Konfiguracja PIC24FJ128GA010 (bez zmian)
+#pragma config POSCMOD = XT
+#pragma config OSCIOFNC = ON
+#pragma config FCKSM = CSDCMD
+#pragma config FNOSC = PRI
+#pragma config IESO = ON
+#pragma config WDTPS = PS32768
+#pragma config FWPSA = PR128
+#pragma config WINDIS = ON
+#pragma config FWDTEN = OFF
+#pragma config ICS = PGx2
+#pragma config GWRP = OFF
+#pragma config GCP = OFF
+#pragma config JTAGEN = OFF
+
+#include <xc.h>
+#include "lcd.h"
+#include "libpic30.h"
+#include <stdint.h>
+#include <string.h>
+
+#define FCY 4000000UL
+
+// Funkcja opóźnienia w ms
+void delay_ms(unsigned long ms) {
+    __delay32((FCY / 1000) * ms);
+}
+
+// Tekst do przesuwania po ekranie LCD
+const char reklama[] = "  🔥 Kup PIC – programuj z mocą! 🔧   ";
+
+void pokaz_reklame(const char *tekst) {
+    char bufor[17];
+    size_t dlugosc = strlen(tekst);
+
+    for (size_t i = 0; i < dlugosc - 15; i++) {
+        strncpy(bufor, &tekst[i], 16);
+        bufor[16] = '\0';
+
+        LCD_ClearScreen();
+        LCD_PutString(bufor, strlen(bufor));
+        delay_ms(300);
+    }
+}
+
+int main(void) {
+    LCD_Initialize();
+    LCD_ClearScreen();
+
+    LCD_PutString("🔥 REKLAMA PIC 🔧", 16);
+    delay_ms(1500);
+
+    while (1) {
+        pokaz_reklame(reklama);
+    }
+
+    return 0;
+}
